@@ -139,7 +139,7 @@ def run_daily(func, run_time="every_bar", append=True):
     else:
         try:
             datetime.strptime(run_time, '%H:%M')
-            if run_time < '09:30' or run_time > '15:00' or ('11:30' < run_time < '13:30'):
+            if run_time < '09:00' or run_time > '15:35' or ('11:30' < run_time < '13:30'):
                 raise ValueError
 
             if run_time + ':00' not in strategy.run_daily.keys():
@@ -346,8 +346,13 @@ def run_file(strategy_file: str,
         context.strategy_name = name
 
         if output_dir is not None:
-            context.output_dir = output_dir
+            if os.path.exists(output_dir):
+                context.output_dir = output_dir
+            else:
+                print("output_dir参数指定的目录不存在！")
+                return
 
+        context.run_start = datetime.now()
         if run_type == 'bt':
             _set_backtest_period(start, end)
             back_test_run(trace)

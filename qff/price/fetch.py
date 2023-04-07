@@ -30,7 +30,7 @@ import pandas as pd
 from datetime import date
 from pytdx.hq import TdxHq_API
 from retrying import retry
-from qff.tools.date import is_trade_day, get_trade_gap, run_time, get_real_trade_date
+from qff.tools.date import is_trade_day, get_trade_gap, get_real_trade_date
 from qff.tools.logs import log
 from qff.tools.tdx import get_best_ip, select_market_code, select_index_code
 
@@ -117,7 +117,7 @@ def fetch_price(code, count=None, freq='day', market='stock', start=None):
         if start is None:
             count = 1
         else:
-            count = get_trade_gap(start, date.today())
+            count = get_trade_gap(start, str(date.today()))
             count = int(count * c)
             if count > 40800:
                 count = 40800
@@ -165,8 +165,9 @@ def fetch_price(code, count=None, freq='day', market='stock', start=None):
                 # 这里的问题是: 如果只取了一天的股票,而当天停牌, 那么就直接返回None了
                 return None
 
-    except Exception as e:
-        log.error(e)
+    except Exception as err:
+        log.error(f'fetch_price exception:{err}')
+        return None
 
 
 def fetch_today_min_curve(code, market='stock'):
@@ -289,7 +290,7 @@ def fetch_today_transaction(code):
                 data = data.drop(['value'], axis=1)
             return data
     except Exception as err:
-        log.error(err)
+        log.error(f'fetch_today_transaction exception:{err}')
         return None
 
 
@@ -400,7 +401,7 @@ def fetch_stock_xdxr(code):
                                         'qianzongguben': 'shares_before'}) \
 
         data = data.assign(date=data['date'].apply(lambda x: str(x)[0:10]))\
-            .set_index('date', drop=False, inplace=False)
+            .set_index('date', drop=False, inplace=False).sort_index()
 
     else:
         data = None

@@ -155,18 +155,19 @@ class Context:
 
     @property
     def run_progress(self):
-        total = get_trade_gap(self.start_date, self.end_date)
-        crt = get_trade_gap(self.start_date, self.current_dt[:10])
-        return round(crt / total, 4)
+        if self.run_type == RUN_TYPE.BACK_TEST:
+            total = get_trade_gap(self.start_date, self.end_date)
+            crt = get_trade_gap(self.start_date, self.current_dt[:10])
+            return round(crt / total, 4)
+        else:
+            return 1
 
     @property
     def spend_time(self):
-        if self.status == RUN_STATUS.DONE:
+        if self.run_type == RUN_TYPE.BACK_TEST and self.status == RUN_STATUS.DONE:
             end = self.run_end
-        elif self.status == RUN_STATUS.RUNNING:
-            end = datetime.now()
         else:
-            return None
+            end = datetime.now()
 
         delta = end - self.run_start
         hour = int(delta.seconds / 3600)
@@ -184,7 +185,7 @@ class Context:
             "运行频率": self.run_freq,
             "开始日期": self.start_date,
             "结束日期": self.end_date,
-            "回测周期": get_trade_gap(self.start_date, self.end_date),
+            "回测周期": get_trade_gap(self.start_date, self.end_date) if self.run_type == RUN_TYPE.BACK_TEST else None,
             "当前日期": self.current_dt,
             "运行天数": get_trade_gap(self.start_date, self.current_dt[:10]),
             "基准指数": self.benchmark,
@@ -222,6 +223,15 @@ class GlobalVar:
     """
     def __init__(self):
         self.type = None
+
+# class ContextData:
+#
+#     def __getitem__(self, item):
+#         if not isinstance(item, str):
+#             print("数据对象下标错误！")
+#             return None
+#         if len(item) == 6:
+#             return
 
 
 strategy = Strategy()

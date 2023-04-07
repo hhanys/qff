@@ -28,7 +28,7 @@ from qff.tools.date import get_trade_min_list
 from qff.price.fetch import fetch_current_ticks, fetch_today_min_curve, fetch_price
 
 from qff.frame.context import context
-from qff.frame.const import RUN_TYPE
+from qff.frame.const import RUN_TYPE, RUN_STATUS
 from typing import Optional
 import pandas as pd
 
@@ -376,7 +376,7 @@ class RealtimeData(UnitData):
     def pre_close(self):
         if self._ticks is None:
             self._ticks = fetch_current_ticks(self.code, self.market)
-        return self._ticks['pre_close']
+        return self._ticks['last_close']
 
     @property
     def last_price(self):
@@ -384,11 +384,15 @@ class RealtimeData(UnitData):
             self._ticks = fetch_current_ticks(self.code, self.market)
             return self._ticks['price']
         elif self._bar_time == context.current_dt[11:16]:
-            return self._bar['close']
+            return self._bar['close'][0]
         else:
             self._bar = fetch_price(self.code, 1, '1m', self.market)
-            self._bar_time = context.current_dt[11:16]
-            return self._bar['close']
+            if self._bar is not None:
+                self._bar_time = context.current_dt[11:16]
+                return self._bar['close'][0]
+            else:
+                self._ticks = fetch_current_ticks(self.code, self.market)
+                return self._ticks['price']
 
     @property
     def high_all_day(self):
@@ -415,11 +419,15 @@ class RealtimeData(UnitData):
             self._ticks = fetch_current_ticks(self.code, self.market)
             return self._ticks['price']
         elif self._bar_time == context.current_dt[11:16]:
-            return self._bar['high']
+            return self._bar['high'][0]
         else:
             self._bar = fetch_price(self.code, 1, '1m', self.market)
-            self._bar_time = context.current_dt[11:16]
-            return self._bar['high']
+            if self._bar is not None:
+                self._bar_time = context.current_dt[11:16]
+                return self._bar['high'][0]
+            else:
+                self._ticks = fetch_current_ticks(self.code, self.market)
+                return self._ticks['price']
 
     @property
     def last_low(self):
@@ -427,11 +435,16 @@ class RealtimeData(UnitData):
             self._ticks = fetch_current_ticks(self.code, self.market)
             return self._ticks['price']
         elif self._bar_time == context.current_dt[11:16]:
-            return self._bar['low']
+            return self._bar['low'][0]
         else:
             self._bar = fetch_price(self.code, 1, '1m', self.market)
-            self._bar_time = context.current_dt[11:16]
-            return self._bar['low']
+            if self._bar is not None:
+                self._bar_time = context.current_dt[11:16]
+                return self._bar['low'][0]
+            else:
+                self._ticks = fetch_current_ticks(self.code, self.market)
+                return self._ticks['price']
+
 
     def paused(self):
         self._ticks = fetch_current_ticks(self.code, self.market)
@@ -470,6 +483,10 @@ def get_current_data(code, market='stock'):
 
 
     """
+    if context.status != RUN_STATUS.RUNNING:
+        print("get_current_data为回测模拟专用API函数，只能在策略运行过程中使用！")
+        return None
+
     if market not in ['stock', 'index', 'etf']:
         log.error("get_current_data()出错，market值错误{}".format(market))
         return None

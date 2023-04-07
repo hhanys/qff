@@ -65,13 +65,16 @@ def back_test_run(trace=False):
                                 start=get_pre_trade_day(context.start_date),
                                 end=context.end_date,
                                 market='index')
+    if context.bm_data is None:
+        log.error(f"基准{context.benchmark}指数数据未成功获取，可能数据未下载!")
+        return
+
     context.bm_start = context.bm_data.iloc[0].close
-    context.run_start = datetime.datetime.now()
     if trace:
         bt_thread = threading.Thread(target=_back_test_run)
         bt_thread.setDaemon(True)
         # 运行命令行环境...
-        trace = Trace()
+        trace = Trace(bt_thread)
         bt_thread.start()
         trace.cmdloop()
         log.warning("命令行交互环境退出...")
@@ -139,7 +142,7 @@ def _back_test_run():
     if context.status == RUN_STATUS.PAUSED:
         # log.warning("_back_test_run回测运行暂停，保存过程数据...!")
 
-        default_name = context.strategy_name+'_bt.pkl'
+        default_name = context.strategy_name+'.pkl'
         if ' ' in default_name:
             default_name = '_'.join(default_name.split(' '))
         bf_input = input(f"输入备份文件名称[{default_name}]:")
@@ -148,6 +151,8 @@ def _back_test_run():
         backup_file = '{}{}{}'.format(cache_path, os.sep, bf_input)
         print(f"策略备份文件：{backup_file}")
         save_context(backup_file)
+        if bf_input != default_name:
+            save_context()
     elif context.status == RUN_STATUS.CANCELED:
         log.warning("_back_test_run回测执行取消...!")
     else:

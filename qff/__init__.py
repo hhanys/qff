@@ -22,7 +22,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-__version__ = "0.5.3"
+__version__ = "0.5.12"
 
 import sys
 
@@ -70,6 +70,7 @@ from qff.price.query import (
     get_stock_block,
     get_block_stock,
     get_index_stocks,
+    get_industry_stocks,
     get_index_name,
     get_mtss,
     get_all_securities,
@@ -83,7 +84,9 @@ from qff.price.finance import (
     get_history_fundamentals,
     get_fundamentals,
     get_stock_reports,
-    get_fundamentals_continuously
+    get_fundamentals_continuously,
+    get_stock_forecast,
+    get_stock_express
 )
 
 from qff.price.fetch import (
@@ -159,6 +162,6 @@ from qff.helper.formula import (
 )
 
 from qff.helper.indicator import ind_ma, ind_macd, ind_atr, ind_kdj, ind_rsi, ind_boll
-from qff.helper.common import filter_st_stock, filter_paused_stock, filter_20pct_stock, select_zt_stock
+from qff.helper.common import filter_st_stock, filter_paused_stock, filter_20pct_stock, select_zt_stock, filter_bj_stock
 from qff.price.cache import get_current_data, UnitData
 from qff.frame.evaluation import strategy_eval

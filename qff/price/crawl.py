@@ -45,6 +45,8 @@ def crawl_delist_stock():
 
     delist = pd.concat([sz, sh])
     delist = delist[delist['code'].str[:1].isin(['6', '0', '3'])]
+    delist.start = delist.start.apply(lambda x: str(x)[:10])
+    delist.end = delist.end.apply(lambda x: str(x)[:10])
     return delist
 
 
@@ -67,8 +69,10 @@ def crawl_stock_list():
     bj = bj.iloc[:, [0, 1, 4]]
     bj.columns = pd.Index(['code', 'name', 'start'])
 
-    return pd.concat([sh, sz, bj])
+    df = pd.concat([sh, sz, bj])
+    df.start = df.start.apply(lambda x: str(x)[:10])
 
+    return df
 
 def crawl_index_list():
     """
@@ -79,6 +83,15 @@ def crawl_index_list():
     df.columns = pd.Index(['code', 'name', 'start'])
     return df
 
+def crawl_industry_stock_cons(symbol: str = "801010") -> pd.DataFrame:
+    """
+    :param symbol: 行业代码, 可以通过 ak.index_component_sw() 函数获取
+    :type symbol: str
+    :return: 最新股票行业的成份股清单
+    :rtype: pandas.DataFrame
+    """    
+    component_sw_df = ak.index_component_sw(symbol=symbol)
+    return component_sw_df
 
 def crawl_index_stock_cons(symbol: str = "000300") -> pd.DataFrame:
     """

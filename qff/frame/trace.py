@@ -84,8 +84,9 @@ class Trace(Cmd):
     prompt = "QFF> "  # 定义命令行提示符
     intro = '--------欢迎进入QFF交互环境(log命令可开关日志，help命令获取帮助)------------'
 
-    def __init__(self):
+    def __init__(self, thread_id):
         Cmd.__init__(self)
+        self.thread_id = thread_id
         pd.set_option('display.unicode.ambiguous_as_wide', True)
         pd.set_option('display.unicode.east_asian_width', True)
         pd.set_option('display.width', 200)  # 设置打印宽度(**重要**)
@@ -267,23 +268,34 @@ class Trace(Cmd):
             log.set_level(arg)
 
     def do_pause(self, arg):
+        print("正在暂停策略运行，请耐心等待运行环境备份...")
         context.status = RUN_STATUS.PAUSED
         time.sleep(1)
-        print("暂停回测任务，执行quit命令退出交互环境！")
+        self.thread_id.join()
+        return True
+
 
     def do_resume(self, arg):
         print("恢复策略运行需通过退出本交互环境\n")
-        print("在终端环境下运行 python qff 策略文件名 -r")
+        print("在终端环境下运行 python qff run 策略文件名 -r")
 
     def do_cancel(self, arg):
+        print("正在取消策略运行，请耐心等待策略正常结束...")
         context.status = RUN_STATUS.CANCELED
+        self.thread_id.join()
         return True
 
     def do_quit(self, arg):  # 定义quit命令所执行的操作
-        return True
+        print("注意：回测时策略将继续运行，但无法再进行交互。实盘下将退出策略运行！")
+        ack = input(f"请确认是否真的要退出当前交互环境(Y/N)?:")
+        if ack.strip().lower() == 'y':
+            return True
 
     def do_exit(self, arg):  # 定义quit命令所执行的操作
-        sys.exit(1)
+        ack = input(f"请确认是否真的要退出当前策略运行(Y/N)?:")
+        if ack.strip().lower() == 'y':
+            sys.exit(1)
+
 
     def do_ls(self, arg):
         print(os.path.dirname(os.path.abspath(__file__)))

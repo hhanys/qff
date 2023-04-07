@@ -30,7 +30,7 @@ import pandas as pd
 import numpy as np
 import datetime
 import time
-from typing import  Optional
+from typing import Optional
 from qff.price.fetch import fetch_price, fetch_stock_xdxr, fetch_stock_block
 from qff.price.query import get_all_securities
 from qff.tools.date import get_real_trade_date, get_next_trade_day, util_get_date_gap, get_trade_days, get_pre_trade_day
@@ -95,13 +95,16 @@ def save_security_day(market='stock', security=None):
                     else:
 
                         data = data.loc[:end_date]
-                        dl = get_trade_days(data.index[0], end_date)
+                        dl = get_trade_days(start_date, end_date)
                         if len(dl) > len(data):
                             # 存在停牌日数据
                             dl_df = pd.DataFrame(index=pd.Index(dl, name='date'))
                             data = dl_df.join(data).sort_index()
 
                             data.code.fillna(value=code, inplace=True)
+
+                            if np.isnan(data.loc[start_date, 'close']):
+                                data.loc[start_date, 'close'] = last_recode['close']
                             data.close.fillna(method='ffill', inplace=True)
 
                             data = data.fillna(method='bfill', axis=1)
@@ -159,24 +162,14 @@ def save_security_min(market='stock', freq='1min', security=None):
         coll = DATABASE.get_collection(table_name)
         coll.create_index([("type", 1), ("code", 1), ("datetime", 1)], unique=True)
 
+        data_num = 0
+        data_list = []
+
         start = time.perf_counter()
         total = len(stock_list)
         for item in range(total):
             code = stock_list[item]
             print_progress(item, total, start, code)
-
-        data_num = 0
-        data_list = []
-        start = time.perf_counter()
-        total = len(stock_list)
-        for item in range(total):
-            finsh = "▓" * int(item * 100 / total)
-            need_do = "-" * int((total - item) * 100 / total)
-            progress = (item / total) * 100
-            dur = time.perf_counter() - start
-            tt = dur/(item+1) * total
-            code = stock_list[item]
-            print("\r{:^3.0f}%[{}->{}]{:.2f}s|{:.2f}s ({})".format(progress, finsh, need_do, dur, tt, code), end="")
 
             try:
                 start_date = coll.find_one({'type': freq, 'code': code}, sort=[('datetime', -1)])['datetime']
@@ -245,46 +238,46 @@ def save_stock_xdxr(security=None):
 
             xdxr = fetch_stock_xdxr(str(code))
             if xdxr is None:
+                time.sleep(1)
                 xdxr = fetch_stock_xdxr(str(code))
                 if xdxr is None:
-                    print(f"\n {code}:无复权信息！")
+                    # print(f"\n {code}:无复权信息！")
                     continue
             new_count = len(xdxr)
             db_count = coll_xdxr.count_documents({'code': code})
-            if new_count == db_count:
-                # 无需更新数据库
-                continue
-            elif new_count > db_count:
-                # 将新数据插入xdxr数据库
-                xdxr_insert = xdxr.iloc[db_count - new_count:]
-            else:
+
+            if new_count != db_count:
+
                 # 出现数据库记录数量比实时获取的数据多，则删除
-                xdxr_insert = xdxr
                 coll_xdxr.delete_many({'code': code})
 
-            # try:
-            coll_xdxr.insert_many(util_to_json_from_pandas(xdxr_insert))
-            # except PyMongoError:
-            #     pass
-            # 判断更新的xdxr数据中是否有除权除息类型
-            if 1 not in xdxr_insert['category'].to_list():
-                continue
+                # try:
+                coll_xdxr.insert_many(util_to_json_from_pandas(xdxr))
+                # except PyMongoError:
+                #     pass
 
-            cursor = DATABASE.stock_day.find({'code': code}, {'_id': 0, 'date': 1, 'code': 1, 'close': 1})
-            data = pd.DataFrame([item for item in cursor])
-            if len(data) == 0:
-                continue
-            data = data.set_index('date')
+                # 判断更新的xdxr数据中是否有除权除息类型
+                if new_count > db_count:
+                    xdxr_new = xdxr.iloc[db_count - new_count:]
+                    if 1 not in xdxr_new['category'].to_list():
+                        continue
 
-            qfq = calc_qfq_cof(data, xdxr)  # 计算前复权系数
-            if qfq is None:
-                print(f"\n复权系数均为1，忽略！{code}")
-                continue
-            hfq = calc_hfq_cof(qfq, xdxr)  # 计算后复权系数
-            hfq = hfq.reset_index()
-            adjdata = util_to_json_from_pandas(hfq.loc[:, ['date', 'code', 'qfq', 'hfq']])
-            coll_adj.delete_many({'code': code})
-            coll_adj.insert_many(adjdata)
+                # 计算并更新复权系数
+                cursor = DATABASE.stock_day.find({'code': code}, {'_id': 0, 'date': 1, 'code': 1, 'close': 1})
+                data = pd.DataFrame([item for item in cursor])
+                if len(data) == 0:
+                    continue
+                data = data.set_index('date')
+
+                qfq = calc_qfq_cof(data, xdxr)  # 计算前复权系数
+                if qfq is None:
+                    print(f"\n复权系数均为1，忽略！{code}")
+                    continue
+                hfq = calc_hfq_cof(qfq, xdxr)  # 计算后复权系数
+                hfq = hfq.reset_index()
+                adjdata = util_to_json_from_pandas(hfq.loc[:, ['date', 'code', 'qfq', 'hfq']])
+                coll_adj.delete_many({'code': code})
+                coll_adj.insert_many(adjdata)
 
         except Exception as e:
             print("\nError save_stock_xdxr exception!")
@@ -410,6 +403,3 @@ def calc_hfq_cof(bfq: pd.DataFrame, xdxr: pd.DataFrame) -> Optional[pd.DataFrame
 if __name__ == '__main__':
 
     save_stock_xdxr('601399')
-
-
-

@@ -31,10 +31,10 @@ from typing import Dict, Optional
 from datetime import datetime
 from bson.regex import Regex
 from qff.tools.mongo import DATABASE
-from qff.tools.date import util_time_stamp, get_pre_trade_day, is_trade_day, get_real_trade_date, util_date_valid
+from qff.tools.date import get_pre_trade_day, is_trade_day, get_real_trade_date, util_date_valid, util_time_valid
 from qff.tools.utils import util_code_tolist
 from qff.tools.logs import log
-from qff.frame.context import context
+from qff.frame.context import context, RUN_TYPE, RUN_STATUS
 
 __all__ = ['get_price', 'get_bars', 'get_stock_list', 'get_stock_name', 'get_index_stocks', 'get_block_stock',
            'get_mtss', 'get_all_securities', 'get_security_info', 'get_st_stock', 'get_paused_stock',
@@ -119,19 +119,30 @@ def get_price(security, start=None, end=None, freq='daily', fields=None, skip_pa
             freq not in ['daily', '1d', 'day', '1min', '5min', '15min', '30min', '60min', '1m', '5m', '15m', '30m',
                          '60m'] or fq not in ['pre', 'post', None]:
         log.error('get_price：参数错误！对照API文档检查market、freq、fq等参数的合法性！')
+        return None
     if market != 'stock' and skip_paused:
         log.error('get_price：参数错误！对照API文档检查market、skip_paused、fq等参数的合法性！')
+        return None
 
     # 2、开始和结束时间计算
     if end is None:
         end = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         if not is_trade_day(end[:10]):
             end = get_real_trade_date(end)
+    else:
+        if not util_date_valid(end) and not util_time_valid(end):
+            log.error('get_price：参数错误！对照API文档检查end参数的合法性！')
+            return None
+
     if start is None:
         if count is None:
             start = end
         else:
             start = get_pre_trade_day(end, count - 1, freq)
+    else:
+        if not util_date_valid(start) and not util_time_valid(start):
+            log.error('get_price：参数错误！对照API文档检查start参数的合法性！')
+            return None
 
     if freq in ['daily', '1d', 'day']:
         start = str(start)[:10]
@@ -355,19 +366,21 @@ def attribute_history(security, count, unit='1d', fields=None, fq='pre'):
     if unit in ['daily', '1d', 'day']:
         end_date = context.previous_date
         data = get_price(security, end=end_date, fields=fields, freq=unit, count=count, skip_paused=True, fq=fq)
-        data = data[fields]
+        if data is not None:
+            data = data[fields]
 
     elif unit in ['1m', '5m', '15m', '30m', '60m']:
         end_date = context.current_dt
         data = get_price(security, end=end_date, fields=fields, freq=unit, count=count + 1, skip_paused=True, fq=fq)
-        data = data[fields].iloc[:-1]
+        if data is not None:
+            data = data[fields].iloc[:-1]
     else:
         log.error("attribute_history(): unit 参数错误!")
         return None
     return data
 
 
-def get_bars(security, count, unit='1d', fields=None, include_now=False, end_dt=None, fq_ref_date=None):
+def get_bars(security, count, unit='1d', fields=None, include_now=False, end_dt=None, fq_ref_date=None, market='stock'):
     # type: (list, int, str, Optional[list], bool, Optional[str], Optional[str]) -> Optional[pd.DataFrame]
     """
     获取各种时间周期的 bar 数据， bar 的分割方式与主流股票软件相同， 而且支持返回当前时刻所在 bar 的数据；
@@ -386,6 +399,15 @@ def get_bars(security, count, unit='1d', fields=None, include_now=False, end_dt=
         * 由于bar的最小单位是一分钟，所以end_dt的秒没有什么意义，会被替换为0，例如："2019-11-22 9:35:23" 和 "2019-11-22 9:35:00" 是一样的。
     :param fq_ref_date: 复权基准日期，支持的类型为str或None,为None时为不复权数据。
 
+        * 回测/模拟环境中默认为 context.current_dt
+        * 在投研环境下默认为datetime.now()
+        * 如果输入 fq_ref_date = None, 则获取到的是不复权的数据
+        * 如果想获取后复权的数据，可以将fq_ref_date 指定为一个股票IPO之前很早的日期，比如 datetime.date(1990, 1, 1)
+        * 定点复权，以某一天价格点位为参照物，进行的前复权或后复权。
+        * 设置为datetime.datetime.now()即返回前复权数据。
+        * 设置为context.current_dt返回动态复权数据，
+    :param market: 市场类型，目前支持[“stock", ”index","ETF"], 默认“stock".
+
     :return:
 
        * 若security为字符串格式的标的代码时，返回pandas.DataFrame，dataframe 的index是一个日期字符串
@@ -403,6 +425,39 @@ def get_bars(security, count, unit='1d', fields=None, include_now=False, end_dt=
         get_bars('600507',5,unit='1d', fields=['date','open', 'high', 'low', 'close'],include_now=True, end_dt='2018-01-05 11:00:00', fq_ref_date='2018-01-05')
 
 
+    """
+    """
+    log.debug('调用get_bar' + str(locals()).replace('{', '(').replace('}', ')'))
+    # 1、参数合法性判断
+    if market not in ['stock', 'index', 'etf'] or \
+            unit not in ['daily', '1d', 'day', '1min', '5min', '15min', '30min', '60min', '1m', '5m', '15m', '30m',
+                         '60m']:
+        log.error('get_bar：参数错误！对照API文档检查market、unit参数的合法性！')
+        return None
+
+    # 2. end_dt
+    if end_dt is None:
+        if context.status == RUN_STATUS.RUNNING:
+            end_dt = context.current_dt
+        else:
+            end_dt = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    else:
+        if not isinstance(end_dt, str) or (not util_date_valid(end_dt) and not util_time_valid(end_dt)):
+            log.error('get_bar：参数错误！对照API文档检查end_dt参数的合法性！')
+            return None
+
+
+    if context.run_type == RUN_TYPE.BACK_TEST and context.status == RUN_STATUS.RUNNING:
+        pass
+    elif context.run_type == RUN_TYPE.SIM_TRADE and context.status == RUN_STATUS.RUNNING:
+        pass
+    else:
+        pass
+
+    # 2. 获取当天日期，决定使用历史数据还是实时数据
+    today = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    if is_trade_day(today[:10]) and end_dt[:10]:
+        pass
     """
     return None
 
@@ -491,19 +546,28 @@ def get_security_info(code, market='stock'):
     :type code: 字符串
     :param market: 用来过滤code的类型,目前支持的type仅有['stock', 'index', 'etf]
     :type market: 字符串
-    :return: 一个对象, 有如下属性:
-        1. name: 中文名称
-        2. start: 上市日期, 字符串类型
-        3. end: 退市日期（股票是最后一个交易日，不同于摘牌日期）, 如果没有退市则为2200-01-01
+    :return: 一个字典对象, 有如下key值:
 
-    示例：
+        1. code: 股票代码
+        2. name: 中文名称
+        3. start: 上市日期, 字符串类型
+        4. end: 退市日期（股票是最后一个交易日，不同于摘牌日期）, 如果没有退市则为2200-01-01
+
+    :example:
+
+    ::
         # 获取股票000001的上市时间
         start_date = get_security_info('000001').start
         print(start)
+
     """
     coll = DATABASE.get_collection(market + '_list')
     cursor = coll.find({'code': code}, {'_id': 0})
-    return cursor[0]
+    try:
+        rtn = cursor[0]
+    except IndexError:
+        rtn = {'code': code, 'name': '代码不存在', 'start': '', 'end': ''}
+    return rtn
 
 
 def get_stock_list(date=None):
@@ -552,6 +616,66 @@ def get_index_stocks(index, date=None):
     cursor = coll.find(filter, {"_id": 0, "code": 1})
     return [item["code"] for item in cursor]
 
+def get_industry_stocks(industry, date=None):
+    """
+    获取一个行业给定日期的成分股列表.目前仅支持(申万I级)：
+    * '801010' ：农林牧渔
+    * '801030' ：基础化工
+    * '801040' ：钢铁
+    * '801050' ：有色金属
+    * '801080' ：电子
+    * '801110' ：家用电器
+    * '801120' ：食品饮料
+    * '801130' ：纺织服饰
+    * '801140' ：轻工制造
+    * '801150' ：医药生物
+    * '801160' ：公用事业
+    * '801170' ：交通运输
+    * '801180' ：房地产
+    * '801200' ：商贸零售
+    * '801210' ：社会服务
+    * '801230' ：综合
+    * '801710' ：建筑材料
+    * '801720' ：建筑装饰
+    * '801730' ：电力设备
+    * '801740' ：国防军工
+    * '801750' ：计算机
+    * '801760' ：传媒
+    * '801770' ：通信
+    * '801780' ：银行
+    * '801790' ：非银金融
+    * '801880' ：汽车
+    * '801890' ：机械设备
+    * '801950' ：煤炭
+    * '801960' ：石油石化
+    * '801970' ：环保
+    * '801980' ：美容护理
+
+    :param industry: 字符串，一个指数代码，如‘801010’
+    :param date: 字符串，查询日期, 如'2015-10-15'.
+                默认为None,指当前日期
+    :return: 返回股票代码的list
+    """
+    if industry not in ['801010', '801030', '801040', '801050', '801080', '801110', '801120', '801130', 
+                     '801140', '801150', '801160', '801170', '801180', '801200', '801210', '801230', 
+                     '801710', '801720', '801730', '801740', '801750', '801760', '801770', '801780', 
+                     '801790', '801880', '801890', '801950', '801960', '801970', '801980']:
+        #log.error("get_index_stocks: 参数index仅支持 ['000016', '000852', '000905', '000906','000300', '000010', '000688']")
+        log.error("get_industry_stocks: 参数industry仅支持(申万I级)")
+        return None
+    filter: Dict[str, any] = {"index": industry}
+    if date is None:
+        filter["end"] = '2200-01-01'
+    elif util_date_valid(date):
+        filter['end'] = {"$gt": date}
+        filter['start'] = {"$lte": date}
+    else:
+        log.error('get_industry_stocks：参数错误！date参数不合法！')
+        return None
+
+    coll = DATABASE.industry_stock
+    cursor = coll.find(filter, {"_id": 0, "code": 1})
+    return [item["code"] for item in cursor]
 
 def get_stock_name(code=None, date=None):
     """
@@ -581,7 +705,14 @@ def get_stock_name(code=None, date=None):
     else:
         coll = DATABASE.stock_list
     cursor = coll.find(filter, {"_id": 0, "code": 1, "name": 1})
-    return {item["code"]: item["name"] for item in cursor}
+    rtn = {item["code"]: item["name"] for item in cursor}
+
+    # 修复stock_list和stock_name两个结合数据来源不一致造成的bug
+    if code is not None and len(code) > len(rtn):
+        diff = {i: "-" for i in code if i not in rtn.keys()}
+        rtn = dict(**rtn, **diff)
+
+    return rtn
 
 
 def get_index_name(code=None):
@@ -674,7 +805,7 @@ def get_paused_stock(code=None, date=None):
         log.error("参数date输入不合法！")
         return None
 
-    filter['date_stamp'] = util_time_stamp(date)
+    filter['date'] = date
     filter['vol'] = {'$lt': 1}
 
     coll = DATABASE.stock_day

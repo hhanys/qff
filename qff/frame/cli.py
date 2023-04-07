@@ -38,7 +38,7 @@ from qff.tools.kshow import kshow
 # subprocess.Popen
 
 __all__ = ['Command', 'RunCommand', 'SimTradeCommand', 'ResumeCommand', 'CreateCommand',
-           'ConfigCommand', 'SaveCommand', 'DbinfoCommand', 'KshowCommand']
+           'ConfigCommand', 'SaveCommand', 'DropCommand', 'DbinfoCommand', 'KshowCommand']
 
 
 class Command:
@@ -81,7 +81,7 @@ class RunCommand(Command):
         self.parser.add_argument("strategy_file", help="策略文件名称路径", nargs='?')
         self.parser.add_argument("-n", "--name", help="策略名称,默认为策略文件名", metavar="<name>")
         self.parser.add_argument("-rt", "--run-type", choices=['bt', 'sim'], default='bt',
-                                 help="设置策略运行类型,bt为回测,st为模拟交易,默认为bt")
+                                 help="设置策略运行类型,bt为回测,sim为模拟交易,默认为bt")
 
         self.parser.add_argument("-f", "--freq", choices=['day', 'min', 'tick'], default='day',
                                  help="设置回测执行频率,可选(day, min, tick),默认day")
@@ -321,9 +321,10 @@ class SaveCommand(Command):
         ⌨️命令格式：qff save report            : 保存/更新股票财务报表                                                        \n\
         ⌨️命令格式：qff save valuation         : 保存/更新股票市值数据                                                        \n\
         ⌨️命令格式：qff save mtss              : 保存/更新融资融券数据                                                        \n\
-        ⌨️命令格式：qff save index_stock       : 保存/更新指数成分股信息                                                      \n\
+        ⌨️命令格式：qff save index_stock       : 保存/更新指数成分股信息                                                       \n\
+        ⌨️命令格式：qff save industry_stock    : 保存/更新行业成分股信息                                                      \n\
         --------------------------------------------------------------------------------------------------------------------\n\
-        ⌨️命令格式：qff save init_info         : 初始化股票列表、指数列表、ETF列表                                        \n\
+        ⌨️命令格式：qff save init_info         : 初始化股票列表、指数列表、ETF列表                                              \n\
         ⌨️命令格式：qff save init_name         : 初始化股票历史更名数据                                                        \n\
         ⌨️命令格式：qff save save_delist       : 保存退市股票的日数据和分钟数据                                                 \n\
         ----------------------------------------------------------------------------------------------------------------------\n\
@@ -344,11 +345,33 @@ class SaveCommand(Command):
         if args.subcommand is None or \
                 args.subcommand not in ['all', 'day', 'min', 'stock_list', 'stock_day', 'index_day', 'etf_day',
                                         'stock_min', 'index_min', 'etf_min', 'stock_xdxr', 'stock_block', 'report',
-                                        'valuation', 'mtss', 'index_stock', 'init_info', 'init_name', 'save_delist']:
+                                        'valuation', 'mtss', 'index_stock', 'industry_stock', 'init_info', 'init_name', 'save_delist']:
 
             self.parser.print_help()
             return
         qff_save(args.subcommand)
+
+
+class DropCommand(Command):
+    """
+    删除指定的数据表，用于数据维护，数据表名称可通过qff dbinfo查看。
+    """
+    usage = f"\nqff drop <table_name>"
+    summary = "删除指定的数据表"
+
+    def __init__(self, sub_parser):
+        super().__init__('drop', sub_parser)
+
+    def add_options(self) -> None:
+        self.parser.add_argument("table_name", help="需要删除的数据表名称", nargs='?')
+
+    def main(self, args):
+        from qff.store.update_all import qff_drop
+
+        if args.table_name is None:
+            self.parser.print_help()
+        else:
+            qff_drop(args.table_name)
 
 
 class DbinfoCommand(Command):
