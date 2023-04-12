@@ -224,15 +224,6 @@ class GlobalVar:
     def __init__(self):
         self.type = None
 
-# class ContextData:
-#
-#     def __getitem__(self, item):
-#         if not isinstance(item, str):
-#             print("数据对象下标错误！")
-#             return None
-#         if len(item) == 6:
-#             return
-
 
 strategy = Strategy()
 context = Context()

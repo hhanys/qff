@@ -277,7 +277,7 @@ def fetch_today_transaction(code):
 
     try:
         with api.connect(ip, port):
-            # data = pd.DataFrame()
+            data = pd.DataFrame()
             data = pd.concat([api.to_df(api.get_transaction_data(
                 select_market_code(str(code)), code, (2 - i) * 2000, 2000))
                 for i in range(3)], axis=0, sort=False)

@@ -74,6 +74,7 @@ def crawl_stock_list():
 
     return df
 
+
 def crawl_index_list():
     """
     获取最新指数列表
@@ -83,15 +84,6 @@ def crawl_index_list():
     df.columns = pd.Index(['code', 'name', 'start'])
     return df
 
-def crawl_industry_stock_cons(symbol: str = "801010") -> pd.DataFrame:
-    """
-    :param symbol: 行业代码, 可以通过 ak.index_component_sw() 函数获取
-    :type symbol: str
-    :return: 最新股票行业的成份股清单
-    :rtype: pandas.DataFrame
-    """    
-    component_sw_df = ak.index_component_sw(symbol=symbol)
-    return component_sw_df
 
 def crawl_index_stock_cons(symbol: str = "000300") -> pd.DataFrame:
     """
@@ -131,6 +123,17 @@ def crawl_index_stock_cons(symbol: str = "000300") -> pd.DataFrame:
     temp_df = temp_df.iloc[:, :3]
     temp_df["品种代码"] = temp_df["品种代码"].astype(str).str.zfill(6)
     return temp_df
+
+
+def crawl_industry_stock_cons(symbol: str = "801010") -> pd.DataFrame:
+    """
+    :param symbol: 行业代码, 可以通过 ak.index_component_sw() 函数获取
+    :type symbol: str
+    :return: 最新股票行业的成份股清单
+    :rtype: pandas.DataFrame
+    """
+    component_sw_df = ak.index_component_sw(symbol=symbol)
+    return component_sw_df
 
 
 def crawl_csindex():

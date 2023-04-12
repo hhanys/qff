@@ -115,6 +115,7 @@ class RunCommand(Command):
             backup_file = '{}{}{}'.format(cache_path, os.sep, file_name + '.pkl')
             try:
                 load_context(backup_file)
+                args['trace'] = True
             except Exception as e:
                 print("导入context备份文件失败:{}".format(e))
                 return
@@ -321,10 +322,10 @@ class SaveCommand(Command):
         ⌨️命令格式：qff save report            : 保存/更新股票财务报表                                                        \n\
         ⌨️命令格式：qff save valuation         : 保存/更新股票市值数据                                                        \n\
         ⌨️命令格式：qff save mtss              : 保存/更新融资融券数据                                                        \n\
-        ⌨️命令格式：qff save index_stock       : 保存/更新指数成分股信息                                                       \n\
+        ⌨️命令格式：qff save index_stock       : 保存/更新指数成分股信息                                                      \n\
         ⌨️命令格式：qff save industry_stock    : 保存/更新行业成分股信息                                                      \n\
         --------------------------------------------------------------------------------------------------------------------\n\
-        ⌨️命令格式：qff save init_info         : 初始化股票列表、指数列表、ETF列表                                              \n\
+        ⌨️命令格式：qff save init_info         : 初始化股票列表、指数列表、ETF列表                                        \n\
         ⌨️命令格式：qff save init_name         : 初始化股票历史更名数据                                                        \n\
         ⌨️命令格式：qff save save_delist       : 保存退市股票的日数据和分钟数据                                                 \n\
         ----------------------------------------------------------------------------------------------------------------------\n\
@@ -345,7 +346,8 @@ class SaveCommand(Command):
         if args.subcommand is None or \
                 args.subcommand not in ['all', 'day', 'min', 'stock_list', 'stock_day', 'index_day', 'etf_day',
                                         'stock_min', 'index_min', 'etf_min', 'stock_xdxr', 'stock_block', 'report',
-                                        'valuation', 'mtss', 'index_stock', 'industry_stock', 'init_info', 'init_name', 'save_delist']:
+                                        'valuation', 'mtss', 'index_stock', 'industry_stock', 'init_info', 'init_name',
+                                        'save_delist']:
 
             self.parser.print_help()
             return

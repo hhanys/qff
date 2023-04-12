@@ -73,7 +73,7 @@ def get_fundamentals(filter, projection=None, date=None, report_date=None):
     ::
 
         # 策略在开盘前选择净利润增长率大于30%的股票
-        def before_trading_start():
+        def before_trading_start(context):
             filter = {'f184' : {"$gt": 0.3}}
             df = get_fundamentals(filter=filter, projection={'f184': 1}, date=context.previous_date)
             g.security = df['code'].to_list()
@@ -127,7 +127,7 @@ def get_fundamentals(filter, projection=None, date=None, report_date=None):
         if start < '2000-01-01':
             start = '2000-01-01'
         filter['f314'] = {
-            "$lt": date_to_int(end[2:]),
+            "$lte": date_to_int(end[2:]),
             "$gte": date_to_int(start[2:])
         }
 
@@ -584,7 +584,7 @@ def get_history_fundamentals(code, fields, watch_date=None, report_date=None, co
     if fields is not None:
         if isinstance(fields, list):
             if not all(isinstance(field, str) for field in fields):  #and field.isdigit() 
-                log.error("参数fields不合法！,应该为字符串列表,范围'f001'~'f580'！")
+                log.error("参数fields不合法！,应该为字符串列表,范围'001'~'580'！")
                 return None
             projection = dict.fromkeys(fields, 1)
         else:
@@ -666,17 +666,12 @@ def get_history_fundamentals(code, fields, watch_date=None, report_date=None, co
             #     .groupby(['code', 'report_date'], as_index=False).first()
 
             if interval == '1q':
-                #rtn = db_data.sort_values('report_date', ascending=False)\
-                #      .groupby(['code'], as_index=False).head(count)
                 qf=db_data[db_data['report_date'].apply(lambda x: str(x)).str.contains('0331')]
-                #qq=db_data.loc[:,'f314']
                 l=db_data.set_index(['code','report_date','f314'])
                 qm=l.diff()
                 qd=qm.reset_index()
                 ue=qd[~qd['report_date'].apply(lambda x: str(x)).str.contains('0331')]
                 uw=pd.concat([ue,qf])
-                #uh.drop(columns='f314',inplace=True)
-                #uw=pd.concat([uh,qq],axis=1)
                 rtn=uw.sort_values('report_date', ascending=False).groupby(['code'], as_index=False).head(count)
             else:
                 rtn = db_data.sort_values('report_date', ascending=False)\

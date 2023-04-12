@@ -34,11 +34,11 @@ from qff.tools.mongo import DATABASE
 from qff.tools.date import get_pre_trade_day, is_trade_day, get_real_trade_date, util_date_valid, util_time_valid
 from qff.tools.utils import util_code_tolist
 from qff.tools.logs import log
-from qff.frame.context import context, RUN_TYPE, RUN_STATUS
+from qff.frame.context import context, RUN_STATUS
 
 __all__ = ['get_price', 'get_bars', 'get_stock_list', 'get_stock_name', 'get_index_stocks', 'get_block_stock',
            'get_mtss', 'get_all_securities', 'get_security_info', 'get_st_stock', 'get_paused_stock',
-           'get_stock_block', 'history', 'attribute_history', 'get_index_name']
+           'get_stock_block', 'history', 'attribute_history', 'get_index_name', 'get_industry_stocks']
 
 
 def get_price(security, start=None, end=None, freq='daily', fields=None, skip_paused=False, fq='pre', count=None,
@@ -277,7 +277,7 @@ def history(count, unit='1d', field='close', security_list=None, skip_paused=Fal
     # type: (int, str, str, list, bool, str ) -> Optional[pd.DataFrame]
     """
 
-    回测环境/模拟专用API
+    回测/模拟专用API
     获取历史数据，可查询多个股票的单个数据字段，返回数据格式为 DataFrame
     当取天数据时, 不包括当天的, 即使是在收盘后；分钟数据不包括当前分钟的数据，没有未来
 
@@ -297,6 +297,10 @@ def history(count, unit='1d', field='close', security_list=None, skip_paused=Fal
     :return:  [pandas.DataFrame]对象, 行索引是datetime字符串, 列索引是股票代号.
 
     """
+    if context.status != RUN_STATUS.RUNNING:
+        print("history为回测模拟专用API函数，只能在策略运行过程中使用！")
+        return None
+
     log.debug('调用history' + str(locals()).replace('{', '(').replace('}', ')'))
     code = security_list if security_list is not None else context.universe
     code = util_code_tolist(code)
@@ -335,7 +339,7 @@ def history(count, unit='1d', field='close', security_list=None, skip_paused=Fal
 
 def attribute_history(security, count, unit='1d', fields=None, fq='pre'):
     """
-    回测环境/模拟专用API
+    回测/模拟专用API
     查看某一支股票的历史数据, 可以选这只股票的多个属性, 默认跳过停牌日期.
     当取天数据时, 不包括当天的, 即使是在收盘后；分钟数据不包括当前分钟的数据，没有未来；
 
@@ -360,6 +364,10 @@ def attribute_history(security, count, unit='1d', fields=None, fq='pre'):
     :type fq: str or None
 
     """
+    if context.status != RUN_STATUS.RUNNING:
+        print("attribute_history为回测模拟专用API函数，只能在策略运行过程中使用！")
+        return None
+
     log.debug('调用attribute_history' + str(locals()).replace('{', '(').replace('}', ')'))
     if fields is None:
         fields = ['open', 'close', 'high', 'low', 'vol', 'amount']
@@ -381,8 +389,10 @@ def attribute_history(security, count, unit='1d', fields=None, fq='pre'):
 
 
 def get_bars(security, count, unit='1d', fields=None, include_now=False, end_dt=None, fq_ref_date=None, market='stock'):
-    # type: (list, int, str, Optional[list], bool, Optional[str], Optional[str]) -> Optional[pd.DataFrame]
+    # type: (list, int, str, Optional[list], bool, Optional[str], Optional[str], str) -> Optional[pd.DataFrame]
     """
+    **函数暂未实现**
+
     获取各种时间周期的 bar 数据， bar 的分割方式与主流股票软件相同， 而且支持返回当前时刻所在 bar 的数据；
     get_bars 开盘时取的bar高开低收都是当天的开盘价，成交量成交额为0；
     get_bars 没有跳过停牌选项，所获取的数据都是不包含停牌的数据，如果bar个数少于count个，则返回实际个数，并不会填充。
@@ -426,6 +436,7 @@ def get_bars(security, count, unit='1d', fields=None, include_now=False, end_dt=
 
 
     """
+
     """
     log.debug('调用get_bar' + str(locals()).replace('{', '(').replace('}', ')'))
     # 1、参数合法性判断
@@ -616,9 +627,11 @@ def get_index_stocks(index, date=None):
     cursor = coll.find(filter, {"_id": 0, "code": 1})
     return [item["code"] for item in cursor]
 
+
 def get_industry_stocks(industry, date=None):
     """
-    获取一个行业给定日期的成分股列表.目前仅支持(申万I级)：
+    获取申万一级行业给定日期的成分股列表.目前仅支持(申万I级)：
+
     * '801010' ：农林牧渔
     * '801030' ：基础化工
     * '801040' ：钢铁
@@ -656,11 +669,10 @@ def get_industry_stocks(industry, date=None):
                 默认为None,指当前日期
     :return: 返回股票代码的list
     """
-    if industry not in ['801010', '801030', '801040', '801050', '801080', '801110', '801120', '801130', 
-                     '801140', '801150', '801160', '801170', '801180', '801200', '801210', '801230', 
-                     '801710', '801720', '801730', '801740', '801750', '801760', '801770', '801780', 
-                     '801790', '801880', '801890', '801950', '801960', '801970', '801980']:
-        #log.error("get_index_stocks: 参数index仅支持 ['000016', '000852', '000905', '000906','000300', '000010', '000688']")
+    if industry not in ['801010', '801030', '801040', '801050', '801080', '801110', '801120', '801130',
+                        '801140', '801150', '801160', '801170', '801180', '801200', '801210', '801230',
+                        '801710', '801720', '801730', '801740', '801750', '801760', '801770', '801780',
+                        '801790', '801880', '801890', '801950', '801960', '801970', '801980']:
         log.error("get_industry_stocks: 参数industry仅支持(申万I级)")
         return None
     filter: Dict[str, any] = {"index": industry}
@@ -676,6 +688,7 @@ def get_industry_stocks(industry, date=None):
     coll = DATABASE.industry_stock
     cursor = coll.find(filter, {"_id": 0, "code": 1})
     return [item["code"] for item in cursor]
+
 
 def get_stock_name(code=None, date=None):
     """

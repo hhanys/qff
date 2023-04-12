@@ -1,4 +1,4 @@
-#！/usr/bin/python
+# ！/usr/bin/python
 
 # coding :utf-8
 #
@@ -38,7 +38,7 @@ from qff.store.save_mtss import save_mtss_data
 from qff.tools.mongo import DATABASE
 from qff.tools.date import is_trade_day
 from qff.tools.logs import log
-import prettytable as pt                        
+import prettytable as pt
 import datetime
 import pandas as pd
 
@@ -60,7 +60,7 @@ def update_all(date=None):
     save_stock_list()
     for market_ in ['stock', 'index', 'etf']:
         save_security_day(market_)
-        for freq_ in ["1min"]: #, "5min", "15min", "30min", "60min"]
+        for freq_ in ["1min", "5min", "15min", "30min", "60min"]:
             save_security_min(market=market_, freq=freq_)
 
     save_stock_xdxr()
@@ -151,7 +151,7 @@ def qff_save(*args):
 
     elif args[0] == 'min':
         for market_ in ['stock', 'index', 'etf']:
-            for freq_ in ["1min"]:  #, "5min", "15min", "30min", "60min"]
+            for freq_ in ["1min", "5min", "15min", "30min", "60min"]:
                 save_security_min(market=market_, freq=freq_)
 
     elif args[0] == 'stock_list':
@@ -161,7 +161,7 @@ def qff_save(*args):
         save_security_day(str(args[0]).split('_')[0])
 
     elif args[0] in ['stock_min', 'index_min', 'etf_min']:
-        for freq_ in ["1min"]:  #, "5min", "15min", "30min", "60min"]
+        for freq_ in ["1min", "5min", "15min", "30min", "60min"]:
             save_security_min(market=str(args[0]).split('_')[0], freq=freq_)
 
     elif args[0] == 'stock_xdxr':
@@ -181,10 +181,10 @@ def qff_save(*args):
 
     elif args[0] == 'index_stock':
         save_index_stock()
-    
+
     elif args[0] == 'industry_stock':
         save_industry_stock()
-    
+
     elif args[0] == 'init_info':
         init_stock_list()
         init_index_list()
